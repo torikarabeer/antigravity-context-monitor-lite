@@ -1,8 +1,6 @@
 # Antigravity Context Monitor Lite
 
-A small personal-use VS Code extension for observing Antigravity Cascade context usage.
-
-It displays the estimated current context usage and the active model in the VS Code Status Bar.
+A small personal-use extension for **Antigravity** that displays estimated Cascade context usage and the active model in the Status Bar.
 
 Example:
 
@@ -29,14 +27,14 @@ There is no guarantee of compatibility with future versions of Antigravity.
 - Retrieves the effective context window limit from Antigravity metadata
 - Calculates current context usage percentage
 - Resolves the active model ID to a model label
-- Displays the result in the VS Code Status Bar
+- Displays the result in the Antigravity Status Bar
 - Observes context usage changes between polling cycles
 
 The main purpose is simple: to make the current Antigravity context usage visible while working, so it is easier to decide when continuing a conversation may no longer be desirable.
 
 ## Verified environment
 
-This project was developed and tested on Windows with Antigravity.
+This project was developed and tested **only with Antigravity on Windows**.
 
 At the time of testing:
 
@@ -55,7 +53,11 @@ These observations describe the behavior seen during testing. They do not establ
 
 This project depends on undocumented/internal Antigravity interfaces.
 
-Antigravity updates may change or remove these interfaces and cause the extension to stop working.
+**Antigravity is the only environment in which this extension has been tested.**
+
+It has **not been tested with standard Visual Studio Code or other editors/environments**, and compatibility with them is not guaranteed.
+
+Antigravity updates may change or remove the internal interfaces used by this extension and cause it to stop working.
 
 Changes to the underlying Gemini models or Antigravity's internal implementation may also affect its behavior.
 
@@ -68,8 +70,10 @@ The observed behavior described above represents the tested environment and shou
 ## Platform
 
 - Windows
-- VS Code / Antigravity
+- Antigravity
 - TypeScript
+
+**Tested only with Antigravity.**
 
 ## Development
 
