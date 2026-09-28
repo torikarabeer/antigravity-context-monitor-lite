@@ -85,4 +85,4 @@ npm run compile
 
 ## License
 
-This project is currently provided without a license.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
