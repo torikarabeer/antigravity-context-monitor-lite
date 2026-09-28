@@ -1,6 +1,6 @@
 # Antigravity Context Monitor Lite
 
-A small personal VS Code extension for observing Antigravity Cascade context usage.
+A small personal-use VS Code extension for observing Antigravity Cascade context usage.
 
 It displays the estimated current context usage and the active model in the VS Code Status Bar.
 
@@ -9,6 +9,18 @@ Example:
 ```text
 🧠 Context: 63.9% | Gemini 3.8 Flash (High)
 ```
+
+## About this project
+
+This is a **personal-use project** that I built for my own Antigravity workflow.
+
+It is published on GitHub simply because I thought the implementation and technical investigation might be useful or interesting to others.
+
+This is **not intended to be a maintained or production-ready extension**.
+
+The extension relies on undocumented/internal Antigravity interfaces. If Antigravity or its underlying Gemini-related implementation changes, this extension may stop working at any time.
+
+There is no guarantee of compatibility with future versions of Antigravity.
 
 ## What it does
 
@@ -45,7 +57,11 @@ This project depends on undocumented/internal Antigravity interfaces.
 
 Antigravity updates may change or remove these interfaces and cause the extension to stop working.
 
+Changes to the underlying Gemini models or Antigravity's internal implementation may also affect its behavior.
+
 The project is primarily a personal technical experiment and is not intended to provide a compatibility or maintenance guarantee.
+
+No ongoing maintenance or support is promised.
 
 The observed behavior described above represents the tested environment and should not be interpreted as a guarantee of future Antigravity behavior.
 
