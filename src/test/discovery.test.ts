@@ -5,6 +5,7 @@ import {
     extractWindowsPid,
     extractCsrfToken,
     extractWorkspaceId,
+    extractHubPort,
     selectMatchingProcessLine,
     netstatLineMatchesPid,
     extractPortFromNetstat,
@@ -40,6 +41,11 @@ describe('Discovery Unit Tests', () => {
             assert.equal(extractWindowsPid(line), 12345);
         });
 
+        it('extracts PID from agy.exe process line', () => {
+            const line = '"18520","C:\\Users\\kohot\\.gemini\\bin\\agy.exe --hub --hub-port=50012 --app_data_dir=antigravity --csrf_token=f284dc83-4e21-47a4-8cca-86b7c37215af"';
+            assert.equal(extractWindowsPid(line), 18520);
+        });
+
         it('returns null for header lines and empty input', () => {
             assert.equal(extractWindowsPid(''), null);
             assert.equal(extractWindowsPid('"ProcessId","CommandLine"'), null);
@@ -48,9 +54,14 @@ describe('Discovery Unit Tests', () => {
     });
 
     describe('extractCsrfToken', () => {
-        it('extracts token after --csrf_token', () => {
+        it('extracts token after --csrf_token with space', () => {
             const line = 'exe --csrf_token 30480a91-aeb5-4a99-9867-64fa66ec56f2 --other arg';
             assert.equal(extractCsrfToken(line), '30480a91-aeb5-4a99-9867-64fa66ec56f2');
+        });
+
+        it('extracts token after --csrf_token= with equals sign (agy.exe format)', () => {
+            const line = 'agy.exe --hub --hub-port=50012 --csrf_token=f284dc83-4e21-47a4-8cca-86b7c37215af';
+            assert.equal(extractCsrfToken(line), 'f284dc83-4e21-47a4-8cca-86b7c37215af');
         });
 
         it('returns null when --csrf_token is missing', () => {
@@ -59,7 +70,32 @@ describe('Discovery Unit Tests', () => {
         });
     });
 
+    describe('extractHubPort', () => {
+        it('extracts port from --hub-port=50012 format', () => {
+            const line = 'agy.exe --hub --hub-port=50012 --app_data_dir=antigravity';
+            assert.equal(extractHubPort(line), 50012);
+        });
+
+        it('extracts port from --hub-port 50012 space format', () => {
+            const line = 'agy.exe --hub-port 50012';
+            assert.equal(extractHubPort(line), 50012);
+        });
+
+        it('returns null when --hub-port is missing or invalid', () => {
+            assert.equal(extractHubPort('agy.exe --hub'), null);
+            assert.equal(extractHubPort('agy.exe --hub-port=invalid'), null);
+            assert.equal(extractHubPort('agy.exe --hub-port=999999'), null);
+        });
+    });
+
     describe('selectMatchingProcessLine', () => {
+        it('prefers agy.exe with --hub over legacy language_server lines', () => {
+            const legacyLine = '"26252","language_server_windows_x64.exe --csrf_token legacy123"';
+            const agyLine = '"18520","C:\\Users\\user\\.gemini\\bin\\agy.exe --hub --hub-port=50012 --csrf_token=new123"';
+            const selected = selectMatchingProcessLine([legacyLine, agyLine]);
+            assert.equal(selected, agyLine);
+        });
+
         it('prefers new-style shared LS (without --workspace_id)', () => {
             const oldLine = '"2000","language_server_windows_x64.exe --csrf_token abc --workspace_id ws1"';
             const newLine = '"26252","language_server_windows_x64.exe --csrf_token def"';

@@ -1,8 +1,8 @@
 {
   "name": "antigravity-context-monitor-lite",
   "displayName": "Antigravity Context Monitor Lite",
-  "description": "Personal-use lightweight context monitor for Antigravity IDE (Phase 1: Language Server Discovery)",
-  "version": "0.1.0",
+  "description": "Personal-use lightweight context monitor for Antigravity IDE",
+  "version": "0.1.1",
   "publisher": "personal",
   "license": "MIT",
   "engines": {

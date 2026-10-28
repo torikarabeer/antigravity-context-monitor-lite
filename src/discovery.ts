@@ -90,27 +90,40 @@ export function extractWindowsPid(line: string): number | null {
 }
 
 /**
- * Extract CSRF token from a command line string (--csrf_token <token>).
+ * Extract CSRF token from a command line string (--csrf_token <token> or --csrf_token=<token>).
  */
 export function extractCsrfToken(line: string): string | null {
-    const match = line.match(/--csrf_token\s+([^\s"]+)/);
+    const match = line.match(/--csrf_token(?:=|\s+)([^\s"]+)/);
     return match ? match[1] : null;
 }
 
 /**
- * Extract workspace_id from a command line string (--workspace_id <id>).
+ * Extract workspace_id from a command line string (--workspace_id <id> or --workspace_id=<id>).
  */
 export function extractWorkspaceId(line: string): string | null {
-    const match = line.match(/--workspace_id\s+([^\s"]+)/);
+    const match = line.match(/--workspace_id(?:=|\s+)([^\s"]+)/);
     return match ? match[1] : null;
+}
+
+/**
+ * Extract hub-port from a command line string (--hub-port <port> or --hub-port=<port>).
+ */
+export function extractHubPort(line: string): number | null {
+    const match = line.match(/--hub-port(?:=|\s+)(\d+)/);
+    if (!match) {
+        return null;
+    }
+    const port = parseInt(match[1], 10);
+    return port > 0 && port <= 65535 ? port : null;
 }
 
 /**
  * Select the appropriate Language Server process line.
  * Priority:
- * 1. Process without --workspace_id (Antigravity 1.22.2+ shared LS architecture)
- * 2. Process with matching workspace_id (if workspaceUri specified)
- * 3. First candidate process
+ * 1. agy.exe process with --hub (Antigravity 2.0+ unified CLI / Language Server hub)
+ * 2. Process without --workspace_id (Antigravity 1.22.2+ shared LS architecture)
+ * 3. Process with matching workspace_id (if workspaceUri specified)
+ * 4. First candidate process
  */
 export function selectMatchingProcessLine(lines: readonly string[], workspaceUri?: string): string | null {
     if (lines.length === 0) {
@@ -120,15 +133,24 @@ export function selectMatchingProcessLine(lines: readonly string[], workspaceUri
         return lines[0];
     }
 
+    // Priority 1: agy.exe with --hub
+    const agyHubLines = lines.filter(l => {
+        const low = l.toLowerCase();
+        return low.includes('agy') && low.includes('--hub');
+    });
+    if (agyHubLines.length > 0) {
+        return agyHubLines[0];
+    }
+
     const newStyleLines = lines.filter(l => extractWorkspaceId(l) === null);
     const oldStyleLines = lines.filter(l => extractWorkspaceId(l) !== null);
 
-    // Priority 1: New-style shared LS (no --workspace_id)
+    // Priority 2: New-style shared LS (no --workspace_id)
     if (newStyleLines.length > 0) {
         return newStyleLines[0];
     }
 
-    // Priority 2: Old-style LS matching workspace_id
+    // Priority 3: Old-style LS matching workspace_id
     if (workspaceUri && oldStyleLines.length > 0) {
         const expectedId = buildExpectedWorkspaceId(workspaceUri);
         const match = oldStyleLines.find(l => extractWorkspaceId(l) === expectedId);
@@ -137,7 +159,7 @@ export function selectMatchingProcessLine(lines: readonly string[], workspaceUri
         }
     }
 
-    // Priority 3: Fallback to first line
+    // Priority 4: Fallback to first line
     return lines[0];
 }
 
@@ -191,6 +213,7 @@ export function extractPortFromNetstat(line: string): number | null {
 
 /**
  * Discover Windows Language Server processes via WMIC or PowerShell Get-CimInstance.
+ * Supports both legacy language_server_windows and unified agy.exe processes.
  */
 async function discoverWindowsProcesses(signal?: AbortSignal, log?: (msg: string) => void): Promise<string> {
     const winRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
@@ -202,14 +225,14 @@ async function discoverWindowsProcesses(signal?: AbortSignal, log?: (msg: string
         try {
             const result = await execFileAsync(wmicExe, [
                 'process', 'where',
-                "name like 'language_server_windows%'",
+                "name like 'language_server_windows%' or name like 'agy%'",
                 'get', 'ProcessId,CommandLine', '/format:csv'
             ], { encoding: 'utf-8', timeout: 5000, signal });
 
-            if (result.stdout && result.stdout.includes('language_server_windows')) {
+            if (result.stdout && (result.stdout.includes('language_server_windows') || result.stdout.includes('agy'))) {
                 return result.stdout;
             }
-            log?.('[Lite] WMIC returned no language_server rows; falling back to PowerShell');
+            log?.('[Lite] WMIC returned no language_server or agy rows; falling back to PowerShell');
         } catch (e) {
             const msg = (e as Error).message ?? 'unknown';
             log?.(`[Lite] WMIC execution failed (${msg}); falling back to PowerShell`);
@@ -220,7 +243,7 @@ async function discoverWindowsProcesses(signal?: AbortSignal, log?: (msg: string
     try {
         const result = await execFileAsync(psExe, [
             '-NoProfile', '-NoLogo', '-Command',
-            "Get-CimInstance Win32_Process -Filter \"Name like 'language_server_windows%'\" | Select-Object ProcessId, CommandLine | ConvertTo-Csv -NoTypeInformation"
+            "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'language_server_windows*' -or $_.Name -like 'agy*' } | Select-Object ProcessId, CommandLine | ConvertTo-Csv -NoTypeInformation"
         ], { encoding: 'utf-8', timeout: 10000, signal });
         return result.stdout;
     } catch (e) {
@@ -378,7 +401,9 @@ export async function discoverLanguageServer(
     const rawOutput = await discoverWindowsProcesses(signal, log);
     const candidateLines = rawOutput.split('\n').filter(line => {
         const low = line.toLowerCase();
-        return low.includes('language_server_windows') && low.includes('antigravity');
+        const isOldLs = low.includes('language_server_windows') && low.includes('antigravity');
+        const isAgyHub = low.includes('agy') && (low.includes('--hub') || low.includes('antigravity'));
+        return isOldLs || isAgyHub;
     });
 
     if (candidateLines.length === 0) {
@@ -415,7 +440,11 @@ export async function discoverLanguageServer(
     log?.(`[Lite] PID: ${pid}`);
 
     // Step 5: Find listening ports
+    const hubPort = extractHubPort(targetLine);
     const ports = await findListeningPorts(pid, signal, log);
+    if (hubPort !== null && !ports.includes(hubPort)) {
+        ports.unshift(hubPort);
+    }
     if (ports.length === 0) {
         const error = `No listening localhost ports found for PID ${pid}`;
         log?.(`[Lite] Error: ${error}`);
@@ -423,30 +452,23 @@ export async function discoverLanguageServer(
     }
     log?.(`[Lite] Found candidate listening ports: ${ports.join(', ')}`);
 
-    // Step 6: Probe each port (Try HTTPS first, then HTTP)
-    for (const port of ports) {
-        // Try HTTPS
-        if (await probePort(port, csrfToken, true, signal)) {
-            log?.(`[Lite] Port: ${port}`);
-            log?.('[Lite] TLS: true');
-            log?.('[Lite] Discovery succeeded (HTTPS)');
-            return {
-                success: true,
-                info: { pid, port, csrfToken, useTls: true },
-                timestamp
-            };
-        }
+    // Step 6: Probe each port
+    // agy.exe hub uses plain HTTP; legacy language_server_windows uses HTTPS
+    const isAgy = targetLine.toLowerCase().includes('agy') || hubPort !== null;
+    const protocolsToTry = isAgy ? [false, true] : [true, false]; // false: HTTP, true: HTTPS
 
-        // Try HTTP fallback
-        if (await probePort(port, csrfToken, false, signal)) {
-            log?.(`[Lite] Port: ${port}`);
-            log?.('[Lite] TLS: false');
-            log?.('[Lite] Discovery succeeded (HTTP)');
-            return {
-                success: true,
-                info: { pid, port, csrfToken, useTls: false },
-                timestamp
-            };
+    for (const port of ports) {
+        for (const useTls of protocolsToTry) {
+            if (await probePort(port, csrfToken, useTls, signal)) {
+                log?.(`[Lite] Port: ${port}`);
+                log?.(`[Lite] TLS: ${useTls}`);
+                log?.(`[Lite] Discovery succeeded (${useTls ? 'HTTPS' : 'HTTP'})`);
+                return {
+                    success: true,
+                    info: { pid, port, csrfToken, useTls },
+                    timestamp
+                };
+            }
         }
     }
 

@@ -22,11 +22,12 @@ There is no guarantee of compatibility with future versions of Antigravity.
 
 ## What it does
 
+- Discovers the running Antigravity Language Server (supports both unified `agy.exe` hub and legacy `language_server_windows`)
 - Detects the active Antigravity Cascade trajectory
 - Retrieves estimated input token usage
 - Retrieves the effective context window limit from Antigravity metadata
 - Calculates current context usage percentage
-- Resolves the active model ID to a model label
+- Resolves the active model ID to a human-readable model label
 - Displays the result in the Antigravity Status Bar
 - Observes context usage changes between polling cycles
 
@@ -39,15 +40,30 @@ This project was developed and tested **only with Antigravity on Windows**.
 At the time of testing:
 
 - Effective context window: 256,000 tokens
+- Supported Language Server architectures:
+  - Unified Antigravity CLI hub (`agy.exe`, v1.4.9+)
+  - Legacy shared Language Server (`language_server_windows_x64.exe`)
 - Highest observed context usage: 188,590 tokens (73.7%)
 - Context decreases observed: 0
-- Automated tests: 110 passed / 0 failed
-- Observed sessions: 8
-- Total observations: 517
+- Automated tests: 116 passed / 0 failed
+- Observed sessions: 8+
+- Total observations: 517+
 
 The 256,000-token limit was obtained from Antigravity's own generator metadata rather than hardcoded in the extension.
 
 These observations describe the behavior seen during testing. They do not establish how Antigravity handles context beyond the observed range.
+
+## Release History
+
+### 0.1.1 (2026-10-28)
+- Support for unified Antigravity Language Server hub (`agy.exe`, v1.4.9+)
+- Flexible CSRF token parsing (supports both `--csrf_token <token>` and `--csrf_token=<token>`)
+- Direct `--hub-port` extraction from process command line
+- Protocol probe optimization (HTTP-first for `agy.exe` hub to avoid TLS timeout delay)
+- Added 6 automated tests (total 116 passed)
+
+### 0.1.0
+- Initial personal release with Language Server discovery and Connect-RPC context window monitoring
 
 ## Important limitations
 
@@ -81,6 +97,7 @@ The observed behavior described above represents the tested environment and shou
 npm install
 npm test
 npm run compile
+npm run deploy
 ```
 
 ## License
